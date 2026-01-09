@@ -7,8 +7,8 @@ const helmet = require('helmet'); // security headers
 const connectDB = require('./config/db');
 const { errorHandler } = require('./middleware/errorMiddleware');
 const branchRoutes = require('./routes/branchRoutes');
-
 const authRoutes = require('./routes/authRoutes');
+const planRoutes = require('./routes/planRoutes');
 
 connectDB();
 
@@ -25,6 +25,7 @@ app.use(cookieParser());
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/branches', branchRoutes);
+app.use('/api/v1/plans', planRoutes);
 
 app.get('/', (req, res) => {
   res.send('Gym Management API is running...');

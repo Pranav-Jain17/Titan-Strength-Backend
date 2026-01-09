@@ -9,8 +9,6 @@ const {
 
 const router = express.Router();
 
-console.log('Branch Routes file is loading...');
-
 // Middleware to protect routes below
 const { protect, authorize } = require('../middleware/auth');
 

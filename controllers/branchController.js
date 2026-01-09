@@ -1,5 +1,5 @@
 const Branch = require('../models/Branch');
-const User = require('../models/User'); // Import User to validate manager existence
+const User = require('../models/user'); 
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/AppError');
 
