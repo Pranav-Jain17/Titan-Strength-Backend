@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const asyncHandler = require('./asyncHandler');
 const AppError = require('../utils/AppError');
 const User = require('../models/user');
+const { isBlacklisted } = require('../utils/tokenBlacklist');
 
 // Protect routes (Check if user is logged in)
 exports.protect = asyncHandler(async (req, res, next) => {
@@ -14,6 +15,10 @@ exports.protect = asyncHandler(async (req, res, next) => {
   }
 
   if (!token) return next(new AppError('Not authorized to access this route', 401));
+
+  if (isBlacklisted(token)) {
+    return next(new AppError('Not authorized to access this route', 401));
+  }
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
