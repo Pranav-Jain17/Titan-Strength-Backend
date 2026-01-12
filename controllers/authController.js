@@ -139,39 +139,45 @@ exports.getMe = asyncHandler(async (req, res, next) => {
 
 exports.forgotPassword = asyncHandler(async (req, res, next) => {
   const { email } = req.body;
-
   if (!email) {
     return next(new AppError('Please provide an email', 400));
   }
 
-  const user = await User.findOne({ email });
+  const normalizedEmail = String(email).toLowerCase().trim();
+  const user = await User.findOne({ email: normalizedEmail });
 
+  // Always return success to avoid user enumeration.
   if (!user) {
-    return next(new AppError('There is no user with that email', 404));
+    return res.status(200).json({
+      success: true,
+      data: 'If that email exists, a reset link has been sent.'
+    });
   }
 
   const resetToken = user.getResetPasswordToken();
   await user.save({ validateBeforeSave: false });
 
-  const resetUrl = `${getFrontendBaseUrl()}/forgot-password/${resetToken}`;
-
+  const resetUrl = `${getFrontendBaseUrl()}/reset-password?token=${resetToken}`;
   const message = `
-    <h1>You have requested a password reset</h1>
-    <p>Please click the link below to reset your password:</p>
+    <h1>Password reset</h1>
+    <p>You requested a password reset.</p>
+    <p>This link is valid for 1 hour:</p>
     <a href="${resetUrl}" clicktracking=off>${resetUrl}</a>
-    <p>This link is valid for 1 hour.</p>
+    <p>If you did not request this, you can ignore this email.</p>
   `;
 
   try {
     await sendEmail({
       email: user.email,
-      subject: 'Password Reset Request',
+      subject: 'Password reset',
       message
     });
 
-    res.status(200).json({ success: true, data: 'Email sent' });
+    return res.status(200).json({
+      success: true,
+      data: 'If that email exists, a reset link has been sent.'
+    });
   } catch (err) {
-    console.error(err);
     user.resetPasswordToken = undefined;
     user.resetPasswordExpire = undefined;
     await user.save({ validateBeforeSave: false });
@@ -181,70 +187,59 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
 });
 
 exports.resetPassword = asyncHandler(async (req, res, next) => {
-  const token = req.params.token || req.body.token;
-  const newPassword = req.body.password || req.body.newPassword;
-  const confirmPassword = req.body.confirmPassword;
+  const resetToken = req.params.token;
+  const { newPassword } = req.body;
 
-  if (!token) {
-    return next(new AppError('Reset token is required', 400));
-  }
   if (!newPassword) {
-    return next(new AppError('Please provide a new password', 400));
-  }
-  if (typeof newPassword !== 'string' || newPassword.length < 8) {
-    return next(new AppError('Password must be at least 8 characters long', 400));
-  }
-  if (confirmPassword && newPassword !== confirmPassword) {
-    return next(new AppError('Passwords do not match', 400));
+    return next(new AppError('Please provide newPassword', 400));
   }
 
-  const resetPasswordToken = crypto.createHash('sha256').update(String(token)).digest('hex');
+  const resetPasswordToken = crypto
+    .createHash('sha256')
+    .update(String(resetToken))
+    .digest('hex');
 
   const user = await User.findOne({
     resetPasswordToken,
     resetPasswordExpire: { $gt: Date.now() }
-  });
+  }).select('+password');
 
   if (!user) {
-    return next(new AppError('Invalid or expired token', 400));
+    return next(new AppError('Invalid or expired reset token', 400));
   }
 
-  user.password = newPassword;
+  user.password = String(newPassword);
   user.resetPasswordToken = undefined;
   user.resetPasswordExpire = undefined;
-
   await user.save();
 
-  return res.status(200).json({ success: true, data: 'Password reset successful' });
+  // Log the user in after reset
+  sendTokenResponse(user, 200, res);
 });
 
 exports.updatePassword = asyncHandler(async (req, res, next) => {
   const oldPassword = req.body.oldPassword || req.body.currentPassword;
-  const newPassword = req.body.newPassword || req.body.password;
-  const confirmPassword = req.body.confirmPassword;
+  const { newPassword } = req.body;
 
   if (!oldPassword || !newPassword) {
     return next(new AppError('Please provide oldPassword and newPassword', 400));
-  }
-  if (typeof newPassword !== 'string' || newPassword.length < 8) {
-    return next(new AppError('Password must be at least 8 characters long', 400));
-  }
-  if (confirmPassword && newPassword !== confirmPassword) {
-    return next(new AppError('Passwords do not match', 400));
   }
 
   const user = await User.findById(req.user.id).select('+password');
   if (!user) {
     return next(new AppError('User not found', 404));
   }
-  if (!(await user.matchPassword(oldPassword))) {
+
+  const isMatch = await user.matchPassword(String(oldPassword));
+  if (!isMatch) {
     return next(new AppError('Old password is incorrect', 401));
   }
 
-  user.password = newPassword;
+  user.password = String(newPassword);
   await user.save();
 
-  return res.status(200).json({ success: true, data: 'Password updated successfully' });
+  // Refresh token/cookie after password update
+  sendTokenResponse(user, 200, res);
 });
 
 exports.verifyEmail = asyncHandler(async (req, res, next) => {
