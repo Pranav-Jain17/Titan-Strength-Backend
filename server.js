@@ -10,6 +10,7 @@ const branchRoutes = require('./routes/branchRoutes');
 const authRoutes = require('./routes/authRoutes');
 const planRoutes = require('./routes/planRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
+const dashboardRoutes = require('./routes/dashboardRoutes');
 
 connectDB();
 
@@ -25,9 +26,11 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/dashboards', dashboardRoutes);
 app.use('/api/v1/branches', branchRoutes);
 app.use('/api/v1/plans', planRoutes);
 app.use('/api/v1/subscriptions', subscriptionRoutes);
+
 
 app.get('/', (req, res) => {
   res.send('Gym Management API is running...');
