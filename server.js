@@ -11,6 +11,8 @@ const authRoutes = require('./routes/authRoutes');
 const planRoutes = require('./routes/planRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const dashboardRoutes = require('./routes/dashboardRoute');
+const paymentRoutes = require('./routes/paymentRoutes')
+const userRoutes = require('./routes/userRoutes');
 
 connectDB();
 
@@ -30,6 +32,8 @@ app.use('/api/v1/dashboards', dashboardRoutes);
 app.use('/api/v1/branches', branchRoutes);
 app.use('/api/v1/plans', planRoutes);
 app.use('/api/v1/subscriptions', subscriptionRoutes);
+app.use('/api/v1/users', userRoutes);
+app.use('/api/v1/payments', paymentRoutes);
 
 
 app.get('/', (req, res) => {
