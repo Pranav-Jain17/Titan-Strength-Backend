@@ -1,5 +1,5 @@
 const User = require('../models/user');
-const Branch = require('../models/Branch'); 
+const Branch = require('../models/branch'); 
 const Subscription = require('../models/subscription');
 const asyncHandler = require('../middleware/asyncHandler');
 
