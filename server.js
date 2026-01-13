@@ -10,7 +10,7 @@ const branchRoutes = require('./routes/branchRoutes');
 const authRoutes = require('./routes/authRoutes');
 const planRoutes = require('./routes/planRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
-const dashboardRoutes = require('./routes/dashboardRoutes');
+const dashboardRoutes = require('./routes/dashboardRoute');
 
 connectDB();
 
