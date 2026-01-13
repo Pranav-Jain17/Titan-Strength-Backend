@@ -3,8 +3,10 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const sendEmail = require('../utils/sendEmail');
 const asyncHandler = require('../middleware/asyncHandler');
-const AppError = require('../utils/AppError');
+const AppError = require('../utils/appError');
 const { blacklistToken } = require('../utils/tokenBlacklist');
+
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 const normalizeBaseUrl = (url) => (typeof url === 'string' ? url.replace(/\/+$/, '') : url);
 
@@ -53,12 +55,78 @@ const getTokenFromRequest = (req) => {
 exports.register = asyncHandler(async (req, res, next) => {
   const { name, email, password, role } = req.body;
 
+  if (!email || !password || !name) {
+    return next(new AppError('Please provide name, email and password', 400));
+  }
+
+  const normalizedEmail = String(email).toLowerCase().trim();
+
   const normalizedRole = typeof role === 'string' ? role.toLowerCase() : role;
   if (normalizedRole && normalizedRole !== 'user') {
     return next(new AppError('You cannot register with this role directly.', 403));
   }
 
-  const user = await User.create({ name, email, password, role: 'user' });
+  // If the user already exists but is not verified, allow requesting a new
+  // verification email *after* the old token expires (24h).
+  const existingUser = await User.findOne({
+    email: new RegExp(`^${escapeRegExp(normalizedEmail)}$`, 'i')
+  }).select('+password');
+
+  if (existingUser) {
+    if (existingUser.isEmailVerified) {
+      return next(new AppError('Email already registered. Please log in.', 409));
+    }
+
+    const tokenIsStillValid =
+      existingUser.emailVerificationExpire && existingUser.emailVerificationExpire.getTime() > Date.now();
+
+    if (tokenIsStillValid) {
+      return next(
+        new AppError(
+          'Account already exists but is not verified. Please check your email. You can request a new verification email after 24 hours.',
+          409
+        )
+      );
+    }
+
+    // Re-issue verification token and (optionally) update the user's info.
+    existingUser.name = String(name);
+    existingUser.email = normalizedEmail;
+    existingUser.password = String(password);
+    existingUser.role = 'user';
+
+    const verificationToken = existingUser.getEmailVerificationToken();
+    await existingUser.save();
+
+    const verifyUrl = `${getFrontendBaseUrl()}/api/v1/auth/verify-email/${verificationToken}`;
+    const message = `
+      <h1>Verify your email</h1>
+      <p>Please click the link below to verify your email address:</p>
+      <a href="${verifyUrl}" clicktracking=off>${verifyUrl}</a>
+      <p>This link is valid for 24 hours.</p>
+    `;
+
+    try {
+      await sendEmail({
+        email: existingUser.email,
+        subject: 'Verify your email',
+        message
+      });
+    } catch (err) {
+      console.error(err);
+      existingUser.emailVerificationToken = undefined;
+      existingUser.emailVerificationExpire = undefined;
+      await existingUser.save({ validateBeforeSave: false });
+      return next(new AppError('Verification email could not be sent', 500));
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: 'Verification email resent. Please check your email to verify your account.'
+    });
+  }
+
+  const user = await User.create({ name, email: normalizedEmail, password, role: 'user' });
 
   const verificationToken = user.getEmailVerificationToken();
   await user.save({ validateBeforeSave: false });
@@ -97,7 +165,8 @@ exports.login = asyncHandler(async (req, res, next) => {
 
   if (!email || !password) return next(new AppError('Please provide email and password', 400));
 
-  const user = await User.findOne({ email }).select('+password');
+  const normalizedEmail = String(email).toLowerCase().trim();
+  const user = await User.findOne({ email: new RegExp(`^${escapeRegExp(normalizedEmail)}$`, 'i') }).select('+password');
   
   if (!user || !(await user.matchPassword(password))) {
     return next(new AppError('Invalid credentials', 401));
@@ -144,7 +213,7 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
   }
 
   const normalizedEmail = String(email).toLowerCase().trim();
-  const user = await User.findOne({ email: normalizedEmail });
+  const user = await User.findOne({ email: new RegExp(`^${escapeRegExp(normalizedEmail)}$`, 'i') });
 
   // Always return success to avoid user enumeration.
   if (!user) {

@@ -1,7 +1,7 @@
-const Branch = require('../models/Branch');
+const Branch = require('../models/branch');
 const User = require('../models/user'); 
 const asyncHandler = require('../middleware/asyncHandler');
-const AppError = require('../utils/AppError');
+const AppError = require('../utils/appError');
 
 // @desc    Get all branches
 // @route   GET /api/v1/branches

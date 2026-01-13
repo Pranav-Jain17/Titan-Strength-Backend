@@ -1,6 +1,6 @@
-const Plan = require('../models/Plan');
+const Plan = require('../models/plan')
 const asyncHandler = require('../middleware/asyncHandler');
-const AppError = require('../utils/AppError');
+const AppError = require('../utils/appError');
 
 // @desc    Get all active plans
 // @route   GET /api/v1/plans

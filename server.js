@@ -9,6 +9,7 @@ const { errorHandler } = require('./middleware/errorMiddleware');
 const branchRoutes = require('./routes/branchRoutes');
 const authRoutes = require('./routes/authRoutes');
 const planRoutes = require('./routes/planRoutes');
+const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
 connectDB();
 
@@ -26,6 +27,7 @@ app.use(cookieParser());
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/branches', branchRoutes);
 app.use('/api/v1/plans', planRoutes);
+app.use('/api/v1/subscriptions', subscriptionRoutes);
 
 app.get('/', (req, res) => {
   res.send('Gym Management API is running...');
