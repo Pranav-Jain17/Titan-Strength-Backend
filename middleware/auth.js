@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 const asyncHandler = require('./asyncHandler');
-const AppError = require('../utils/AppError');
+const AppError = require('../utils/appError');
 const User = require('../models/user');
 const { isBlacklisted } = require('../utils/tokenBlacklist');
 

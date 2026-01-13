@@ -2,7 +2,8 @@ const express = require('express');
 const { 
   getOwnerDashboard, 
   getManagerDashboard, 
-  getMemberDashboard 
+  getMemberDashboard,
+  getTrainerDashboard
 } = require('../controllers/dashboardController');
 
 const { protect, authorize } = require('../middleware/auth');
@@ -19,5 +20,8 @@ router.get('/manager', authorize('manager', 'owner'), getManagerDashboard);
 
 // Member Route
 router.get('/member', authorize('member', 'user'), getMemberDashboard);
+
+// Trainer Route
+router.get('/trainer', authorize('trainer', 'manager', 'owner'), getTrainerDashboard);
 
 module.exports = router;

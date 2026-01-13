@@ -92,3 +92,25 @@ exports.getMemberDashboard = asyncHandler(async (req, res, next) => {
     }
   });
 });
+
+// @desc    Get Trainer Dashboard Data (Schedule & Classes)
+// @route   GET /api/v1/dashboards/trainer
+// @access  Private (Trainer only)
+exports.getTrainerDashboard = asyncHandler(async (req, res, next) => {
+  // 1. Identify the Trainer
+  const trainerId = req.user.id;
+
+  // 2. TODO: Fetch upcoming classes (We will build the ClassSession model next!)
+  // const upcomingClasses = await ClassSession.find({ trainer: trainerId, startTime: { $gte: Date.now() } });
+  
+  // For now, return a placeholder so the frontend doesn't crash
+  res.status(200).json({
+    success: true,
+    data: {
+      trainerName: req.user.name,
+      todaySchedule: [], // This will eventually hold the list of classes for today
+      nextClass: null,   // This will show "Yoga at 6:00 PM"
+      messages: "You have no classes scheduled yet."
+    }
+  });
+});
