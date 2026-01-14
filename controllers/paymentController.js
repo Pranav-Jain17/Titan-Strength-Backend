@@ -1,8 +1,10 @@
 const Stripe = require('stripe');
 const Plan = require('../models/plan');
 const User = require('../models/user'); // Import User model
+const Subscription = require('../models/subscription');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/appError');
+const createSubscriptionCheckout = require('../utils/createSubscriptionCheckout');
 
 // Initialize Stripe with your Secret Key
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
@@ -51,3 +53,34 @@ exports.getCheckoutSession = asyncHandler(async (req, res, next) => {
     url: session.url // Frontend will redirect window.location.href to this URL
   });
 });
+
+// @desc    Stripe Webhook (Listens for Stripe events)
+// @route   POST /api/v1/payments/webhook
+exports.webhookCheckout = async (req, res) => {
+  const signature = req.headers['stripe-signature'];
+
+  let event;
+
+  try {
+    // 1. Verify this request actually came from Stripe
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    console.error(`Webhook Error: ${err.message}`);
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  // 2. If Payment Succeeded
+  if (event.type === 'checkout.session.completed') {
+    const session = event.data.object;
+
+    // 3. Create Subscription in Database
+    await createSubscriptionCheckout(session);
+  }
+
+  // 4. Return 200 OK to Stripe
+  res.status(200).json({ received: true });
+};

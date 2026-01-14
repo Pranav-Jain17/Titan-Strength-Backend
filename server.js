@@ -13,6 +13,7 @@ const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const dashboardRoutes = require('./routes/dashboardRoute');
 const paymentRoutes = require('./routes/paymentRoutes')
 const userRoutes = require('./routes/userRoutes');
+const paymentController = require('./controllers/paymentController');
 
 connectDB();
 
@@ -24,6 +25,12 @@ app.use(cors({
   origin: [process.env.FRONTEND_URL, 'http://localhost:5173'],
   credentials: true 
 }));
+
+app.post(
+  '/api/v1/payments/webhook', 
+  express.raw({ type: 'application/json' }), 
+  paymentController.webhookCheckout
+);
 app.use(express.json());
 app.use(cookieParser());
 
