@@ -11,9 +11,11 @@ const authRoutes = require('./routes/authRoutes');
 const planRoutes = require('./routes/planRoutes');
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 const dashboardRoutes = require('./routes/dashboardRoute');
-const paymentRoutes = require('./routes/paymentRoutes')
+// const paymentRoutes = require('./routes/paymentRoutes')
 const userRoutes = require('./routes/userRoutes');
-const paymentController = require('./controllers/paymentController');
+const ownerRoutes = require('./routes/revenueRoute');
+// const paymentController = require('./controllers/paymentController');
+const checkSubscriptionExpiry = require('./utils/checkSubscriptionExpiry');
 
 connectDB();
 
@@ -26,11 +28,11 @@ app.use(cors({
   credentials: true 
 }));
 
-app.post(
-  '/api/v1/payments/webhook', 
-  express.raw({ type: 'application/json' }), 
-  paymentController.webhookCheckout
-);
+// app.post(
+//   '/api/v1/payments/webhook', 
+//   express.raw({ type: 'application/json' }), 
+//   paymentController.webhookCheckout
+// );
 app.use(express.json());
 app.use(cookieParser());
 
@@ -40,7 +42,9 @@ app.use('/api/v1/branches', branchRoutes);
 app.use('/api/v1/plans', planRoutes);
 app.use('/api/v1/subscriptions', subscriptionRoutes);
 app.use('/api/v1/users', userRoutes);
-app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/owner', ownerRoutes);
+// app.use('/api/v1/payments', paymentRoutes);
+checkSubscriptionExpiry();
 
 
 app.get('/', (req, res) => {

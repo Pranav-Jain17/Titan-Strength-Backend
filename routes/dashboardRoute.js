@@ -19,7 +19,7 @@ router.get('/owner', authorize('owner'), getOwnerDashboard);
 router.get('/manager', authorize('manager', 'owner'), getManagerDashboard);
 
 // Member Route
-router.get('/member', authorize('member', 'user'), getMemberDashboard);
+router.get('/member', authorize('member'), getMemberDashboard);
 
 // Trainer Route
 router.get('/trainer', authorize('trainer', 'manager', 'owner'), getTrainerDashboard);
