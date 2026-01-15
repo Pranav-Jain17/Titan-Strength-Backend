@@ -4,6 +4,7 @@ const AppError = require('../utils/appError');
 const User = require('../models/user');
 const Subscription = require('../models/subscription');
 const Plan = require('../models/plan');
+const Branch = require('../models/branch');
 
 const Attendance = require('../models/attendance');
 const Equipment = require('../models/equipment');
@@ -238,7 +239,21 @@ exports.updateMaintenanceStatus = asyncHandler(async (req, res, next) => {
 // @route   GET /api/v1/manager/trainers
 // @access  Private (Manager/Owner)
 exports.getTrainers = asyncHandler(async (req, res, next) => {
-  const trainers = await User.find({ role: 'trainer' }).select('name email role');
+  if (req.user.role === 'manager') {
+    const branch = await Branch.findOne({ manager: req.user.id });
+    if (!branch) {
+      return next(new AppError('You are not assigned to a branch yet.', 400));
+    }
+
+    const trainers = await User.find({ role: 'trainer', homeBranch: branch._id }).select('name email role homeBranch');
+    return res.status(200).json({
+      success: true,
+      count: trainers.length,
+      data: trainers
+    });
+  }
+
+  const trainers = await User.find({ role: 'trainer' }).select('name email role homeBranch');
 
   res.status(200).json({
     success: true,
@@ -266,6 +281,22 @@ exports.assignTrainerToMember = asyncHandler(async (req, res, next) => {
   const member = await User.findById(memberId);
   if (!member) return next(new AppError('Member not found', 404));
 
+  // If a manager is performing this action, restrict to their branch
+  if (req.user.role === 'manager') {
+    const branch = await Branch.findOne({ manager: req.user.id });
+    if (!branch) {
+      return next(new AppError('You are not assigned to a branch yet.', 400));
+    }
+
+    if (trainer.homeBranch && String(trainer.homeBranch) !== String(branch._id)) {
+      return next(new AppError('You can only assign trainers from your branch.', 403));
+    }
+
+    if (member.homeBranch && String(member.homeBranch) !== String(branch._id)) {
+      return next(new AppError('You can only assign members from your branch.', 403));
+    }
+  }
+
   const assignment = await TrainerAssignment.create({
     trainer: trainer._id,
     member: member._id,
@@ -277,5 +308,102 @@ exports.assignTrainerToMember = asyncHandler(async (req, res, next) => {
   res.status(201).json({
     success: true,
     data: assignment
+  });
+});
+
+// @desc    Create a Trainer user
+// @route   POST /api/v1/manager/trainers
+// @access  Private (Owner or Manager of the branch)
+exports.createTrainer = asyncHandler(async (req, res, next) => {
+  const { name, email, password, branchId } = req.body;
+
+  if (!name || !email || !password) {
+    return next(new AppError('Please provide name, email, and password', 400));
+  }
+
+  const existing = await User.findOne({ email: email.toLowerCase() });
+  if (existing) {
+    return next(new AppError('Email already in use', 400));
+  }
+
+  let homeBranch = null;
+
+  if (req.user.role === 'manager') {
+    const branch = await Branch.findOne({ manager: req.user.id });
+    if (!branch) {
+      return next(new AppError('You are not assigned to a branch yet.', 400));
+    }
+
+    // Managers can only create trainers for their own branch
+    if (branchId && String(branchId) !== String(branch._id)) {
+      return next(new AppError('You can only create trainers for your branch.', 403));
+    }
+
+    homeBranch = branch._id;
+  } else {
+    // Owner can create trainer for any branch (optional)
+    if (branchId) {
+      const branch = await Branch.findById(branchId);
+      if (!branch) return next(new AppError('Branch not found', 404));
+      homeBranch = branch._id;
+    }
+  }
+
+  const trainer = await User.create({
+    name,
+    email: email.toLowerCase(),
+    password,
+    role: 'trainer',
+    homeBranch
+  });
+
+  res.status(201).json({
+    success: true,
+    data: {
+      _id: trainer._id,
+      userId: String(trainer._id),
+      name: trainer.name,
+      email: trainer.email,
+      role: trainer.role,
+      homeBranch: trainer.homeBranch
+    }
+  });
+});
+
+// @desc    Assign/move a trainer to a branch
+// @route   PUT /api/v1/manager/trainers/:id/assign-branch
+// @access  Private (Owner or Manager of the branch)
+exports.assignTrainerToBranch = asyncHandler(async (req, res, next) => {
+  const trainer = await User.findById(req.params.id);
+  if (!trainer) return next(new AppError('Trainer not found', 404));
+  if (trainer.role !== 'trainer') return next(new AppError('User is not a trainer', 400));
+
+  const { branchId } = req.body;
+  if (!branchId) return next(new AppError('Please provide branchId', 400));
+
+  if (req.user.role === 'manager') {
+    const branch = await Branch.findOne({ manager: req.user.id });
+    if (!branch) return next(new AppError('You are not assigned to a branch yet.', 400));
+    if (String(branchId) !== String(branch._id)) {
+      return next(new AppError('You can only assign trainers to your branch.', 403));
+    }
+  }
+
+  const branch = await Branch.findById(branchId);
+  if (!branch) return next(new AppError('Branch not found', 404));
+
+  trainer.homeBranch = branch._id;
+  await trainer.save({ validateBeforeSave: false });
+
+  res.status(200).json({
+    success: true,
+    data: {
+      _id: trainer._id,
+      userId: String(trainer._id),
+      name: trainer.name,
+      email: trainer.email,
+      role: trainer.role,
+      homeBranch: trainer.homeBranch
+    }
   });
 });

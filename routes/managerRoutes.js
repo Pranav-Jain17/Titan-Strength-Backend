@@ -10,6 +10,8 @@ const {
   reportMaintenance,
   updateMaintenanceStatus,
   getTrainers,
+  createTrainer,
+  assignTrainerToBranch,
   assignTrainerToMember
 } = require('../controllers/managerController');
 
@@ -31,6 +33,8 @@ router.put('/maintenance/:id/status', updateMaintenanceStatus);
 
 // Trainers
 router.get('/trainers', getTrainers);
+router.post('/trainers', createTrainer);
+router.put('/trainers/:id/assign-branch', assignTrainerToBranch);
 router.post('/trainers/assign-client', assignTrainerToMember);
 
 module.exports = router;
