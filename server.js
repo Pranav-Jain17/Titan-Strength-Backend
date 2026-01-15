@@ -14,6 +14,8 @@ const dashboardRoutes = require('./routes/dashboardRoute');
 // const paymentRoutes = require('./routes/paymentRoutes')
 const userRoutes = require('./routes/userRoutes');
 const ownerRoutes = require('./routes/revenueRoute');
+const managerRoutes = require('./routes/managerRoutes');
+const classesRoutes = require('./routes/classesRoutes');
 // const paymentController = require('./controllers/paymentController');
 const checkSubscriptionExpiry = require('./utils/checkSubscriptionExpiry');
 
@@ -43,6 +45,8 @@ app.use('/api/v1/plans', planRoutes);
 app.use('/api/v1/subscriptions', subscriptionRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/owner', ownerRoutes);
+app.use('/api/v1/manager', managerRoutes);
+app.use('/api/v1/classes', classesRoutes);
 // app.use('/api/v1/payments', paymentRoutes);
 checkSubscriptionExpiry();
 
