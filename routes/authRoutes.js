@@ -3,7 +3,6 @@ const {
 	register,
 	login,
 	logout,
-	getMe,
 	forgotPassword,
 	resetPassword,
 	verifyEmail,
@@ -20,6 +19,5 @@ router.post('/forgot-password', forgotPassword);
 router.put('/reset-password/:token', resetPassword);
 router.put('/update-password', protect, updatePassword);
 router.get('/verify-email/:token', verifyEmail);
-router.get('/me', protect, getMe);
 
 module.exports = router;

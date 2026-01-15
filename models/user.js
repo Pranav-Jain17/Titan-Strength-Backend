@@ -39,6 +39,20 @@ const UserSchema = new mongoose.Schema({
   homeBranch: {
     type: mongoose.Schema.ObjectId,
     ref: 'Branch'
+  },
+
+  // Member profile fields (used by /api/v1/members/*)
+  photoUrl: {
+    type: String,
+    default: ''
+  },
+  goal: {
+    type: String,
+    default: ''
+  },
+  currentWeight: {
+    type: Number,
+    default: null
   }
 }, { timestamps: true });
 
