@@ -2,39 +2,13 @@ const User = require('../models/user');
 const Branch = require('../models/branch'); 
 const Subscription = require('../models/subscription');
 const asyncHandler = require('../middleware/asyncHandler');
+const ownerController = require('./ownerController');
 
 // @desc    Get Owner Dashboard Data (Global Stats)
 // @route   GET /api/v1/dashboards/owner
 // @access  Private (Owner only)
 exports.getOwnerDashboard = asyncHandler(async (req, res, next) => {
-  // 1. Get total counts
-  const totalUsers = await User.countDocuments({ role: 'user' });
-  const totalMembers = await User.countDocuments({ role: 'member' });
-  const totalBranches = await Branch.countDocuments(); 
-  
-  // 2. Get recent subscriptions (Sales)
-  const recentSales = await Subscription.find()
-    .sort('-createdAt')
-    .limit(5)
-    .populate('user', 'name email')
-    .populate('plan', 'name price');
-
-  // 3. Calculate estimated revenue (Sum of active subscriptions)
-  const activeSubs = await Subscription.find({ status: 'active' }).populate('plan');
-  const totalRevenue = activeSubs.reduce((acc, sub) => acc + (sub.plan.price || 0), 0);
-
-  res.status(200).json({
-    success: true,
-    data: {
-      stats: {
-        totalUsers,
-        totalMembers,
-        totalBranches,
-        totalRevenue
-      },
-      recentSales
-    }
-  });
+  return ownerController.getOwnerDashboard(req, res, next);
 });
 
 // @desc    Get Manager Dashboard Data (Branch specific)

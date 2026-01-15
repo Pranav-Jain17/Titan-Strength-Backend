@@ -2,6 +2,7 @@ const Branch = require('../models/branch');
 const User = require('../models/user'); 
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/appError');
+const ownerController = require('./ownerController');
 
 // @desc    Get all branches
 // @route   GET /api/v1/branches
@@ -36,33 +37,7 @@ exports.getBranch = asyncHandler(async (req, res, next) => {
 // @route   POST /api/v1/branches
 // @access  Private (Owner only)
 exports.createBranch = asyncHandler(async (req, res, next) => {
-  const { manager } = req.body;
-
-  // 1. Data Integrity: If a manager is assigned, verify they exist and have role 'manager'
-  if (manager) {
-    const user = await User.findById(manager);
-    
-    if (!user) {
-      return next(new AppError(`No user found with id ${manager}`, 404));
-    }
-
-    if (user.role !== 'manager') {
-      return next(new AppError(`The user ${user.name} is not a Manager. Please update their role first.`, 400));
-    }
-
-    // Optional: Check if this manager is already managing another branch?
-    const existingBranch = await Branch.findOne({ manager });
-    if (existingBranch) {
-      return next(new AppError(`Manager ${user.name} is already assigned to ${existingBranch.name}`, 400));
-    }
-  }
-
-  const branch = await Branch.create(req.body);
-
-  res.status(201).json({
-    success: true,
-    data: branch
-  });
+  return ownerController.createBranch(req, res, next);
 });
 
 // @desc    Update branch
@@ -101,18 +76,5 @@ exports.updateBranch = asyncHandler(async (req, res, next) => {
 // @route   DELETE /api/v1/branches/:id
 // @access  Private (Owner only)
 exports.deleteBranch = asyncHandler(async (req, res, next) => {
-  const branch = await Branch.findById(req.params.id);
-
-  if (!branch) {
-    return next(new AppError(`Branch not found with id of ${req.params.id}`, 404));
-  }
-
-  // Security: Only Owner can close a gym branch
-  if (req.user.role !== 'owner') {
-     return next(new AppError(`Not authorized to delete branches`, 403));
-  }
-
-  await branch.deleteOne();
-
-  res.status(200).json({ success: true, data: {} });
+  return ownerController.deleteBranch(req, res, next);
 });

@@ -72,6 +72,49 @@ exports.checkIn = asyncHandler(async (req, res, next) => {
   });
 });
 
+// @desc    Check-out a checked-in member
+// @route   POST /api/v1/manager/check-out
+// @access  Private (Manager/Owner)
+exports.checkOut = asyncHandler(async (req, res, next) => {
+  const { userId, attendanceId, note } = req.body;
+
+  if (!userId && !attendanceId) {
+    return next(new AppError('Please provide userId or attendanceId', 400));
+  }
+
+  let attendance;
+  if (attendanceId) {
+    attendance = await Attendance.findById(attendanceId);
+  } else {
+    attendance = await Attendance.findOne({ user: userId, checkedOutAt: null }).sort('-checkedInAt');
+  }
+
+  if (!attendance) {
+    return res.status(200).json({
+      success: true,
+      message: 'No active check-in found to check-out'
+    });
+  }
+
+  if (attendance.checkedOutAt) {
+    return res.status(200).json({
+      success: true,
+      message: 'Already checked out',
+      data: attendance
+    });
+  }
+
+  attendance.checkedOutAt = new Date();
+  if (note !== undefined) attendance.note = note;
+  await attendance.save();
+
+  res.status(200).json({
+    success: true,
+    message: 'Checked out successfully',
+    data: attendance
+  });
+});
+
 // @desc    Live attendance list (who is currently in the gym)
 // @route   GET /api/v1/manager/attendance/live
 // @access  Private (Manager/Owner)
@@ -207,6 +250,48 @@ exports.getEquipment = asyncHandler(async (req, res, next) => {
   });
 });
 
+// @desc    Update equipment
+// @route   PUT /api/v1/manager/equipment/:id
+// @access  Private (Manager/Owner)
+exports.updateEquipment = asyncHandler(async (req, res, next) => {
+  const equipment = await Equipment.findById(req.params.id);
+  if (!equipment) return next(new AppError('Equipment not found', 404));
+
+  const { name, tag, status } = req.body;
+  const allowedStatus = ['working', 'out_of_order', 'maintenance'];
+
+  if (name !== undefined) equipment.name = name;
+  if (tag !== undefined) equipment.tag = tag;
+  if (status !== undefined) {
+    if (!allowedStatus.includes(status)) {
+      return next(new AppError(`Invalid status. Use: ${allowedStatus.join(', ')}`, 400));
+    }
+    equipment.status = status;
+  }
+
+  await equipment.save();
+
+  res.status(200).json({
+    success: true,
+    data: equipment
+  });
+});
+
+// @desc    Delete equipment
+// @route   DELETE /api/v1/manager/equipment/:id
+// @access  Private (Manager/Owner)
+exports.deleteEquipment = asyncHandler(async (req, res, next) => {
+  const equipment = await Equipment.findById(req.params.id);
+  if (!equipment) return next(new AppError('Equipment not found', 404));
+
+  await equipment.deleteOne();
+
+  res.status(200).json({
+    success: true,
+    message: 'Equipment deleted'
+  });
+});
+
 // @desc    Report a maintenance issue
 // @route   POST /api/v1/manager/maintenance/report
 // @access  Private (Manager/Owner)
@@ -275,7 +360,14 @@ exports.getTrainers = asyncHandler(async (req, res, next) => {
     return res.status(200).json({
       success: true,
       count: trainers.length,
-      data: trainers
+      data: trainers.map((t) => ({
+        _id: t._id,
+        userId: String(t._id),
+        name: t.name,
+        email: t.email,
+        role: t.role,
+        homeBranch: t.homeBranch || null
+      }))
     });
   }
 
@@ -284,7 +376,96 @@ exports.getTrainers = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     count: trainers.length,
-    data: trainers
+    data: trainers.map((t) => ({
+      _id: t._id,
+      userId: String(t._id),
+      name: t.name,
+      email: t.email,
+      role: t.role,
+      homeBranch: t.homeBranch || null
+    }))
+  });
+});
+
+// 5) LISTS (for dropdowns)
+
+// @desc    List users (role=user)
+// @route   GET /api/v1/manager/users
+// @access  Private (Manager/Owner)
+exports.getUsers = asyncHandler(async (req, res, next) => {
+  const users = await User.find({ role: 'user' }).select('name email role status createdAt homeBranch');
+
+  res.status(200).json({
+    success: true,
+    count: users.length,
+    data: users.map((u) => ({
+      _id: u._id,
+      userId: String(u._id),
+      name: u.name,
+      email: u.email,
+      role: u.role,
+      status: u.status,
+      homeBranch: u.homeBranch || null,
+      createdAt: u.createdAt
+    }))
+  });
+});
+
+// @desc    List managers + the branch they manage
+// @route   GET /api/v1/manager/managers
+// @access  Private (Owner)
+exports.getManagers = asyncHandler(async (req, res, next) => {
+  const ownerController = require('./ownerController');
+  return ownerController.getManagers(req, res, next);
+});
+
+// @desc    List branches
+// @route   GET /api/v1/manager/branches
+// @access  Private (Manager/Owner)
+exports.getBranches = asyncHandler(async (req, res, next) => {
+  if (req.user.role === 'manager') {
+    const branch = await Branch.findOne({ manager: req.user.id }).select('name description phone email address manager');
+    if (!branch) {
+      return res.status(200).json({
+        success: true,
+        count: 0,
+        data: []
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      count: 1,
+      data: [
+        {
+          _id: branch._id,
+          branchId: String(branch._id),
+          name: branch.name,
+          description: branch.description,
+          phone: branch.phone,
+          email: branch.email,
+          address: branch.address,
+          manager: branch.manager || null
+        }
+      ]
+    });
+  }
+
+  const branches = await Branch.find().select('name description phone email address manager');
+
+  res.status(200).json({
+    success: true,
+    count: branches.length,
+    data: branches.map((b) => ({
+      _id: b._id,
+      branchId: String(b._id),
+      name: b.name,
+      description: b.description,
+      phone: b.phone,
+      email: b.email,
+      address: b.address,
+      manager: b.manager || null
+    }))
   });
 });
 
