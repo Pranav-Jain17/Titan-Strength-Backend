@@ -181,6 +181,32 @@ exports.addEquipment = asyncHandler(async (req, res, next) => {
   });
 });
 
+// @desc    List equipment
+// @route   GET /api/v1/manager/equipment?status=working|out_of_order|maintenance
+// @access  Private (Manager/Owner)
+exports.getEquipment = asyncHandler(async (req, res, next) => {
+  const status = (req.query.status || '').toLowerCase();
+  const allowed = ['working', 'out_of_order', 'maintenance'];
+
+  const filter = {};
+  if (status) {
+    if (!allowed.includes(status)) {
+      return next(new AppError(`Invalid status. Use: ${allowed.join(', ')}`, 400));
+    }
+    filter.status = status;
+  }
+
+  const equipment = await Equipment.find(filter)
+    .sort('name')
+    .populate('createdBy', 'name email role');
+
+  res.status(200).json({
+    success: true,
+    count: equipment.length,
+    data: equipment
+  });
+});
+
 // @desc    Report a maintenance issue
 // @route   POST /api/v1/manager/maintenance/report
 // @access  Private (Manager/Owner)

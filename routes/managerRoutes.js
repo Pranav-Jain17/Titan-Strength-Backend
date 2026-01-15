@@ -7,6 +7,7 @@ const {
   getMembers,
   getMemberProfile,
   addEquipment,
+  getEquipment,
   reportMaintenance,
   updateMaintenanceStatus,
   getTrainers,
@@ -27,6 +28,7 @@ router.get('/members', getMembers);
 router.get('/members/:id', getMemberProfile);
 
 // Equipment & maintenance
+router.get('/equipment', getEquipment);
 router.post('/equipment', addEquipment);
 router.post('/maintenance/report', reportMaintenance);
 router.put('/maintenance/:id/status', updateMaintenanceStatus);
