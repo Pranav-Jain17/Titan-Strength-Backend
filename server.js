@@ -18,6 +18,7 @@ const managerRoutes = require('./routes/managerRoutes');
 const classesRoutes = require('./routes/classesRoutes');
 const memberRoutes = require('./routes/memberRoutes');
 const contentRoutes = require('./routes/contentRoutes');
+const trainerRoutes = require('./routes/trainerRoutes');
 // const paymentController = require('./controllers/paymentController');
 const checkSubscriptionExpiry = require('./utils/checkSubscriptionExpiry');
 
@@ -51,6 +52,7 @@ app.use('/api/v1/manager', managerRoutes);
 app.use('/api/v1/classes', classesRoutes);
 app.use('/api/v1/members', memberRoutes);
 app.use('/api/v1/content', contentRoutes);
+app.use('/api/v1/trainers', trainerRoutes);
 // app.use('/api/v1/payments', paymentRoutes);
 checkSubscriptionExpiry();
 
