@@ -8,7 +8,6 @@ const ownerController = require('./ownerController');
 // @route   GET /api/v1/branches
 // @access  Public
 exports.getBranches = asyncHandler(async (req, res, next) => {
-  // Populate manager name, but hide their sensitive info
   const branches = await Branch.find().populate('manager', 'name email');
 
   res.status(200).json({

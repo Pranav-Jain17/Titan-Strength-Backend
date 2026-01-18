@@ -6,9 +6,9 @@ const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/appError');
 const { blacklistToken } = require('../utils/tokenBlacklist');
 
-const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const escapeRegExp = (value) => String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // Escape special characters for regex otherwise /abc/ would match abcc, abcbc, etc.
 
-const normalizeBaseUrl = (url) => (typeof url === 'string' ? url.replace(/\/+$/, '') : url);
+const normalizeBaseUrl = (url) => (typeof url === 'string' ? url.replace(/\/+$/, '') : url); // removes any / from the end of url
 
 const getFrontendBaseUrl = () => {
   const frontendBaseUrl = normalizeBaseUrl(process.env.FRONTEND_URL);
@@ -131,7 +131,7 @@ exports.register = asyncHandler(async (req, res, next) => {
   const verificationToken = user.getEmailVerificationToken();
   await user.save({ validateBeforeSave: false });
 
-  const verifyUrl = `${req.protocol}://${req.get('host')}/api/v1/auth/verify-email/${verificationToken}`;
+  const verifyUrl = `${getFrontendBaseUrl()}/api/v1/auth/verify-email/${verificationToken}`;
 
   const message = `
     <h1>Verify your email</h1>
@@ -281,8 +281,6 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
   user.resetPasswordToken = undefined;
   user.resetPasswordExpire = undefined;
   await user.save();
-
-  // Log the user in after reset
   sendTokenResponse(user, 200, res);
 });
 
@@ -306,8 +304,6 @@ exports.updatePassword = asyncHandler(async (req, res, next) => {
 
   user.password = String(newPassword);
   await user.save();
-
-  // Refresh token/cookie after password update
   sendTokenResponse(user, 200, res);
 });
 
