@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  # 1. Your Node.js Backend
+  api:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      # 👇 IMPORTANT: In Docker, 'localhost' is the container itself.
+      # To talk to the database, we use the service name 'mongo' defined below.
+      - MONGO_URI=mongodb://mongo:27017/titan_strength
+      - JWT_SECRET=your_super_secret_key_123
+      - NODE_ENV=development
+    depends_on:
+      - mongo
+    volumes:
+      # Syncs your local folder with the container so you don't have to rebuild on every code change
+      - .:/app
+      - /app/node_modules
+
+  # 2. The Database
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:

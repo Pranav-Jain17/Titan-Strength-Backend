@@ -1,0 +1,47 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Get the code from GitHub
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # 2. Login to Docker Hub (so we can upload the image)
+      - name: Login to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 3. Build the "Package" (Docker Image) and push it to the cloud
+      - name: Build and Push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKER_USERNAME }}/titan-backend:latest
+
+      # 4. Connect to AWS, delete the old version, and start the new one
+      - name: Deploy to EC2
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST_DNS }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # Stop the old container
+            docker stop titan-backend || true
+            docker rm titan-backend || true
+            
+            # Download the new update
+            docker pull ${{ secrets.DOCKER_USERNAME }}/titan-backend:latest
+            
+            # Start the app
+            # NOTE: We are passing your Mongo URI here so the app knows where to connect
+            docker run -d --name titan-backend -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/titan-backend:latest
