@@ -35,13 +35,28 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # Stop the old container
+            # 1. Stop old container
             docker stop titan-backend || true
             docker rm titan-backend || true
             
-            # Download the new update
+            # 2. Pull new updates
             docker pull ${{ secrets.DOCKER_USERNAME }}/titan-backend:latest
             
-            # Start the app
-            # NOTE: We are passing your Mongo URI here so the app knows where to connect
-            docker run -d --name titan-backend -p 5000:5000 ${{ secrets.DOCKER_USERNAME }}/titan-backend:latest
+            # 3. Start container with ALL environment variables
+            docker run -d \
+              --name titan-backend \
+              -p 5000:5000 \
+              -e NODE_ENV=production \
+              -e PORT=5000 \
+              -e MONGO_URI="${{ secrets.ENV_MONGO_URI }}" \
+              -e JWT_SECRET="${{ secrets.ENV_JWT_SECRET }}" \
+              -e JWT_EXPIRE="${{ secrets.ENV_JWT_EXPIRE }}" \
+              -e JWT_COOKIE_EXPIRE="${{ secrets.ENV_JWT_COOKIE_EXPIRE }}" \
+              -e SMTP_HOST="${{ secrets.ENV_SMTP_HOST }}" \
+              -e SMTP_PORT="${{ secrets.ENV_SMTP_PORT }}" \
+              -e SMTP_SECURE="${{ secrets.ENV_SMTP_SECURE }}" \
+              -e SMTP_USER="${{ secrets.ENV_SMTP_USER }}" \
+              -e SMTP_PASS="${{ secrets.ENV_SMTP_PASS }}" \
+              -e FROM_EMAIL="${{ secrets.ENV_FROM_EMAIL }}" \
+              -e FRONTEND_URL="${{ secrets.ENV_FRONTEND_URL }}" \
+              ${{ secrets.DOCKER_USERNAME }}/titan-backend:latest
