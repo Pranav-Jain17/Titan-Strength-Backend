@@ -59,4 +59,8 @@ jobs:
               -e SMTP_PASS="${{ secrets.ENV_SMTP_PASS }}" \
               -e FROM_EMAIL="${{ secrets.ENV_FROM_EMAIL }}" \
               -e FRONTEND_URL="${{ secrets.ENV_FRONTEND_URL }}" \
+              -e AWS_ACCESS_KEY_ID="${{ secrets.ENV_AWS_ACCESS_KEY_ID }}" \
+              -e AWS_SECRET_ACCESS_KEY="${{ secrets.ENV_AWS_SECRET_ACCESS_KEY }}" \
+              -e AWS_REGION="${{ secrets.ENV_AWS_REGION }}" \
+              -e AWS_BUCKET_NAME="${{ secrets.ENV_AWS_BUCKET_NAME }}" \
               ${{ secrets.DOCKER_USERNAME }}/titan-backend:latest
