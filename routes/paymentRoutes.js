@@ -1,11 +1,18 @@
-// const express = require('express');
-// const { getCheckoutSession } = require('../controllers/paymentController');
-// const { protect } = require('../middleware/auth');
+const express = require('express');
+const { protect } = require('../middleware/auth');
 
-// const router = express.Router();
+const {
+	getRazorpayKey,
+	createRazorpayOrder,
+	verifyRazorpayPaymentAndSubscribe
+} = require('../controllers/paymentController');
 
-// router.use(protect); 
+const router = express.Router();
 
-// router.get('/checkout-session/:planId', getCheckoutSession);
+router.use(protect);
 
-// module.exports = router;
+router.get('/razorpay/key', getRazorpayKey);
+router.post('/razorpay/order', createRazorpayOrder);
+router.post('/razorpay/verify', verifyRazorpayPaymentAndSubscribe);
+
+module.exports = router;

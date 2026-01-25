@@ -1,13 +1,13 @@
 const express = require('express');
-const { getUsers, getUser } = require('../controllers/userController');
+const { getUsers, getUser, uploadAvatar } = require('../controllers/userController');
 const { protect, authorize } = require('../middleware/auth');
+const { uploadAvatar: uploadAvatarMiddleware } = require('../middleware/fileUpload');
 
 const router = express.Router();
 
-// 1. Protect all routes (Someone must be logged in)
 router.use(protect);
 
-// 2. Restrict to Owners and Managers only (Regular members shouldn't see this list)
+router.post('/avatar', uploadAvatarMiddleware.single('avatar'), uploadAvatar);
 router.use(authorize('owner', 'manager'));
 
 router.route('/')

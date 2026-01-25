@@ -1,58 +1,172 @@
-// const Stripe = require('stripe');
-// const Plan = require('../models/plan');
-// const User = require('../models/user'); // Import User model
-// const Subscription = require('../models/subscription');
-// const asyncHandler = require('../middleware/asyncHandler');
-// const AppError = require('../utils/appError');
-// const createSubscriptionCheckout = require('../utils/createSubscriptionCheckout');
+const crypto = require('crypto');
+const Razorpay = require('razorpay');
 
-// // Initialize Stripe with your Secret Key
-// const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const asyncHandler = require('../middleware/asyncHandler');
+const AppError = require('../utils/appError');
 
-// // @desc    Create Stripe Checkout Session
-// // @route   POST /api/v1/payments/checkout-session/:planId
-// // @access  Private (User)
-// exports.getCheckoutSession = asyncHandler(async (req, res, next) => {
-//   const planId = req.params.planId.trim(); 
-//   // 2. Use the clean ID
-//   const plan = await Plan.findById(planId);
-//   if (!plan) {
-//     return next(new AppError('Plan not found', 404));
-//   }
+const Plan = require('../models/plan');
+const Subscription = require('../models/subscription');
 
-//   // 2. Create the Checkout Session
-//   const session = await stripe.checkout.sessions.create({
-//     payment_method_types: ['card'],
-//     mode: 'payment', // Use 'subscription' if you want recurring billing later
-//     success_url: `${process.env.FRONTEND_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
-//     cancel_url: `${process.env.FRONTEND_URL}/plans`,
-//     customer_email: req.user.email, // Pre-fill user's email
-//     client_reference_id: req.params.planId, // We pass the Plan ID to track what they bought
-//     line_items: [
-//       {
-//         price_data: {
-//           currency: 'usd', // or 'inr'
-//           product_data: {
-//             name: plan.name,
-//             description: plan.description,
-//           },
-//           unit_amount: plan.price * 100, // Stripe expects amount in Cents ($50 = 5000)
-//         },
-//         quantity: 1,
-//       },
-//     ],
-//     metadata: {
-//       userId: req.user.id, // We hide the User ID here so we can read it later
-//       planId: req.params.planId
-//     }
-//   });
+const getRazorpayClient = () => {
+	if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+		return null;
+	}
 
-//   // 3. Send the session URL to the frontend
-//   res.status(200).json({
-//     success: true,
-//     url: session.url // Frontend will redirect window.location.href to this URL
-//   });
-// });
+	return new Razorpay({
+		key_id: process.env.RAZORPAY_KEY_ID,
+		key_secret: process.env.RAZORPAY_KEY_SECRET
+	});
+};
+
+// @desc    Get Razorpay public key (safe to expose)
+// @route   GET /api/v1/payments/razorpay/key
+// @access  Private
+exports.getRazorpayKey = asyncHandler(async (req, res, next) => {
+	if (!process.env.RAZORPAY_KEY_ID) {
+		return next(new AppError('Razorpay key is not configured', 500));
+	}
+
+	res.status(200).json({
+		success: true,
+		data: {
+			keyId: process.env.RAZORPAY_KEY_ID
+		}
+	});
+});
+
+// @desc    Create a Razorpay order for purchasing a plan (Cards/UPI handled by Razorpay Checkout)
+// @route   POST /api/v1/payments/razorpay/order
+// @access  Private
+exports.createRazorpayOrder = asyncHandler(async (req, res, next) => {
+	const { planId } = req.body;
+
+	const razorpay = getRazorpayClient();
+	if (!razorpay) {
+		return next(new AppError('Razorpay is not configured', 500));
+	}
+
+	if (!planId) {
+		return next(new AppError('Please provide planId', 400));
+	}
+
+	const plan = await Plan.findById(String(planId).trim());
+	if (!plan || plan.active === false) {
+		return next(new AppError('Plan not found', 404));
+	}
+
+	// Disallow creating a new paid order when an active subscription exists
+	const existingSub = await Subscription.findOne({
+		user: req.user.id,
+		status: 'active',
+		endDate: { $gte: new Date() }
+	});
+	if (existingSub) {
+		return next(new AppError('You already have an active subscription', 400));
+	}
+
+	const amountPaise = Math.round(Number(plan.price) * 100);
+	if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
+		return next(new AppError('Invalid plan price', 500));
+	}
+
+	const order = await razorpay.orders.create({
+		amount: amountPaise,
+		currency: 'INR',
+		receipt: `plan_${String(plan._id)}_${Date.now()}`,
+		notes: {
+			userId: String(req.user.id),
+			planId: String(plan._id)
+		}
+	});
+
+	res.status(201).json({
+		success: true,
+		data: {
+			keyId: process.env.RAZORPAY_KEY_ID,
+			order,
+			plan: {
+				id: String(plan._id),
+				name: plan.name,
+				description: plan.description,
+				price: plan.price,
+				durationDays: plan.durationDays
+			}
+		}
+	});
+});
+
+// @desc    Verify Razorpay payment and activate subscription
+// @route   POST /api/v1/payments/razorpay/verify
+// @access  Private
+exports.verifyRazorpayPaymentAndSubscribe = asyncHandler(async (req, res, next) => {
+	const {
+		planId,
+		razorpay_order_id,
+		razorpay_payment_id,
+		razorpay_signature
+	} = req.body;
+
+	if (!process.env.RAZORPAY_KEY_SECRET) {
+		return next(new AppError('Razorpay is not configured', 500));
+	}
+
+	if (!planId || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+		return next(new AppError('Missing payment verification fields', 400));
+	}
+
+	const plan = await Plan.findById(String(planId).trim());
+	if (!plan || plan.active === false) {
+		return next(new AppError('Plan not found', 404));
+	}
+
+	// Verify signature: HMAC_SHA256(order_id|payment_id)
+	const body = `${razorpay_order_id}|${razorpay_payment_id}`;
+	const expected = crypto
+		.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+		.update(body)
+		.digest('hex');
+
+	if (expected !== razorpay_signature) {
+		return next(new AppError('Invalid payment signature', 400));
+	}
+
+	// Ensure no active subscription exists
+	const existingSub = await Subscription.findOne({
+		user: req.user.id,
+		status: 'active',
+		endDate: { $gte: new Date() }
+	});
+
+	if (existingSub) {
+		return next(new AppError('You already have an active subscription', 400));
+	}
+
+	const endDate = new Date();
+	endDate.setDate(endDate.getDate() + Number(plan.durationDays || 0));
+
+	const subscription = await Subscription.create({
+		user: req.user.id,
+		plan: plan._id,
+		startDate: new Date(),
+		endDate,
+		status: 'active',
+		paymentMethod: 'razorpay',
+		paymentProvider: 'razorpay',
+		paymentId: String(razorpay_payment_id),
+		paymentOrderId: String(razorpay_order_id),
+		currency: 'INR',
+		amountPaid: plan.price
+	});
+
+	// Upgrade user to member (matches existing behavior)
+	req.user.role = 'member';
+	await req.user.save({ validateBeforeSave: false });
+
+	res.status(201).json({
+		success: true,
+		data: subscription
+	});
+});
 
 // // @desc    Stripe Webhook (Listens for Stripe events)
 // // @route   POST /api/v1/payments/webhook

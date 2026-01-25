@@ -1,5 +1,5 @@
 const express = require('express');
-const { protect } = require('../middleware/auth');
+const { protect, authorize } = require('../middleware/auth');
 
 const {
   getMe,
@@ -7,7 +7,8 @@ const {
   getMyStats,
   getMyAttendance,
   getMyPaymentHistory,
-  getMyBookings
+  getMyBookings,
+  updateMyProfile
 } = require('../controllers/memberController');
 
 const router = express.Router();
@@ -20,5 +21,7 @@ router.get('/stats', getMyStats);
 router.get('/attendance', getMyAttendance);
 router.get('/payment-history', getMyPaymentHistory);
 router.get('/my-bookings', getMyBookings);
+
+router.put('/profile', authorize('member'), updateMyProfile);
 
 module.exports = router;

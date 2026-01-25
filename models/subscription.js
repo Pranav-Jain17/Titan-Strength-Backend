@@ -26,8 +26,29 @@ const SubscriptionSchema = new mongoose.Schema({
   },
   paymentMethod: {
     type: String,
-    enum: ['cash', 'card', 'stripe', 'manual'],
+    enum: ['cash', 'card', 'stripe', 'razorpay', 'manual'],
     default: 'manual'
+  },
+  paymentProvider: {
+    type: String,
+    enum: ['manual', 'stripe', 'razorpay'],
+    default: 'manual'
+  },
+  paymentId: {
+    type: String,
+    default: ''
+  },
+  paymentOrderId: {
+    type: String,
+    default: ''
+  },
+  amountPaid: {
+    type: Number,
+    default: null
+  },
+  currency: {
+    type: String,
+    default: ''
   }
 }, { timestamps: true });
 

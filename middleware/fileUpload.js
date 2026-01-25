@@ -33,4 +33,26 @@ const upload = multer({
     }
   }
 });
-module.exports = { upload, s3 };
+
+const uploadAvatar = multer({
+  storage: multerS3({
+    s3: s3,
+    bucket: process.env.AWS_BUCKET_NAME,
+    acl: 'private',
+    contentType: multerS3.AUTO_CONTENT_TYPE,
+    key: function (req, file, cb) {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, `avatars/${uniqueSuffix}${path.extname(file.originalname)}`);
+    }
+  }),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Not an image! Please upload an image file.'), false);
+    }
+  }
+});
+
+module.exports = { upload, uploadAvatar, s3 };

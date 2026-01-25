@@ -1,4 +1,8 @@
 const asyncHandler = require('../middleware/asyncHandler');
+const AppError = require('../utils/appError');
+const { GetObjectCommand } = require('@aws-sdk/client-s3');
+const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+const { s3 } = require('../middleware/fileUpload');
 
 const User = require('../models/user');
 const Subscription = require('../models/subscription');
@@ -11,6 +15,67 @@ const ClassAttendance = require('../models/classAttendance');
 exports.getMe = asyncHandler(async (req, res, next) => {
   const user = await User.findById(req.user.id);
 
+  let photoUrl = user.photoUrl || '';
+  if (photoUrl && typeof photoUrl === 'string' && !photoUrl.startsWith('http')) {
+    try {
+      const command = new GetObjectCommand({
+        Bucket: process.env.AWS_BUCKET_NAME,
+        Key: photoUrl
+      });
+      photoUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    } catch (e) {
+      // If signing fails (missing env/creds), fall back to stored value
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      userId: String(user._id),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      photoUrl,
+      goal: user.goal || '',
+      currentWeight: user.currentWeight ?? null,
+      heightCm: user.heightCm ?? null,
+      homeBranch: user.homeBranch || null,
+      createdAt: user.createdAt
+    }
+  });
+});
+
+// @desc    Update my member profile
+// @route   PUT /api/v1/members/profile
+// @access  Private (Member)
+exports.updateMyProfile = asyncHandler(async (req, res, next) => {
+  const updates = {};
+
+  if (req.body.goal !== undefined) {
+    updates.goal = String(req.body.goal);
+  }
+
+  if (req.body.currentWeight !== undefined) {
+    const w = Number(req.body.currentWeight);
+    if (Number.isNaN(w) || w <= 0) {
+      return next(new AppError('Invalid currentWeight', 400));
+    }
+    updates.currentWeight = w;
+  }
+
+  if (req.body.heightCm !== undefined) {
+    const h = Number(req.body.heightCm);
+    if (Number.isNaN(h) || h <= 0) {
+      return next(new AppError('Invalid heightCm', 400));
+    }
+    updates.heightCm = h;
+  }
+
+  const user = await User.findByIdAndUpdate(req.user.id, updates, {
+    new: true,
+    runValidators: true
+  });
+
   res.status(200).json({
     success: true,
     data: {
@@ -21,6 +86,7 @@ exports.getMe = asyncHandler(async (req, res, next) => {
       photoUrl: user.photoUrl || '',
       goal: user.goal || '',
       currentWeight: user.currentWeight ?? null,
+      heightCm: user.heightCm ?? null,
       homeBranch: user.homeBranch || null,
       createdAt: user.createdAt
     }

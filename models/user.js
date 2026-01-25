@@ -53,6 +53,10 @@ const UserSchema = new mongoose.Schema({
   currentWeight: {
     type: Number,
     default: null
+  },
+  heightCm: {
+    type: Number,
+    default: null
   }
 }, { timestamps: true });
 
