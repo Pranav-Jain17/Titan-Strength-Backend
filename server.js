@@ -4,6 +4,7 @@ const mongoose = require('mongoose');
 const cookieParser = require('cookie-parser'); 
 const cors = require('cors');
 const helmet = require('helmet'); // security headers
+const swaggerUi = require('swagger-ui-express');
 const connectDB = require('./config/db');
 const { errorHandler } = require('./middleware/errorMiddleware');
 const branchRoutes = require('./routes/branchRoutes');
@@ -23,6 +24,13 @@ const attendanceRoutes = require('./routes/attendanceRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 // const paymentController = require('./controllers/paymentController');
 const checkSubscriptionExpiry = require('./utils/checkSubscriptionExpiry');
+
+let swaggerFile;
+try {
+  swaggerFile = require('./swagger-output.json');
+} catch (e) {
+  swaggerFile = null;
+}
 
 connectDB();
 
@@ -59,6 +67,13 @@ app.use('/api/v1/attendance', attendanceRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 checkSubscriptionExpiry();
+
+// Swagger UI (auto-generated via `node swagger.js`)
+app.use(
+  '/api-docs',
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerFile || { info: { title: 'Swagger not generated yet' } })
+);
 
 
 app.get('/', (req, res) => {
