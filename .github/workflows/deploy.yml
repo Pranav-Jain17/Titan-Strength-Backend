@@ -35,32 +35,13 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # 1. Stop old container
             docker stop titan-backend || true
             docker rm titan-backend || true
-            
-            # 2. Pull new updates
             docker pull ${{ secrets.DOCKER_USERNAME }}/titan-backend:latest
             
-            # 3. Start container with ALL environment variables
+            # Use --env-file to tell Docker: "Read the .env file sitting on the server"
             docker run -d \
               --name titan-backend \
               -p 5000:5000 \
-              -e NODE_ENV=production \
-              -e PORT=5000 \
-              -e MONGO_URI="${{ secrets.ENV_MONGO_URI }}" \
-              -e JWT_SECRET="${{ secrets.ENV_JWT_SECRET }}" \
-              -e JWT_EXPIRE="${{ secrets.ENV_JWT_EXPIRE }}" \
-              -e JWT_COOKIE_EXPIRE="${{ secrets.ENV_JWT_COOKIE_EXPIRE }}" \
-              -e SMTP_HOST="${{ secrets.ENV_SMTP_HOST }}" \
-              -e SMTP_PORT="${{ secrets.ENV_SMTP_PORT }}" \
-              -e SMTP_SECURE="${{ secrets.ENV_SMTP_SECURE }}" \
-              -e SMTP_USER="${{ secrets.ENV_SMTP_USER }}" \
-              -e SMTP_PASS="${{ secrets.ENV_SMTP_PASS }}" \
-              -e FROM_EMAIL="${{ secrets.ENV_FROM_EMAIL }}" \
-              -e FRONTEND_URL="${{ secrets.ENV_FRONTEND_URL }}" \
-              -e AWS_ACCESS_KEY_ID="${{ secrets.ENV_AWS_ACCESS_KEY_ID }}" \
-              -e AWS_SECRET_ACCESS_KEY="${{ secrets.ENV_AWS_SECRET_ACCESS_KEY }}" \
-              -e AWS_REGION="${{ secrets.ENV_AWS_REGION }}" \
-              -e AWS_BUCKET_NAME="${{ secrets.ENV_AWS_BUCKET_NAME }}" \
+              --env-file .env \
               ${{ secrets.DOCKER_USERNAME }}/titan-backend:latest
