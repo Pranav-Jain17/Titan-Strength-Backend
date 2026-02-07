@@ -561,7 +561,9 @@ exports.createTrainer = asyncHandler(async (req, res, next) => {
     email: email.toLowerCase(),
     password,
     role: 'trainer',
-    homeBranch
+    homeBranch,
+    isVerified: true,
+    status: 'active' 
   });
 
   res.status(201).json({
@@ -572,7 +574,9 @@ exports.createTrainer = asyncHandler(async (req, res, next) => {
       name: trainer.name,
       email: trainer.email,
       role: trainer.role,
-      homeBranch: trainer.homeBranch
+      homeBranch: trainer.homeBranch,
+      isVerified: trainer.isVerified,
+      status: trainer.status
     }
   });
 });
