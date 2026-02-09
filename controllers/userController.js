@@ -5,6 +5,18 @@ const { GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
 const { s3 } = require('../middleware/fileUpload');
 
+const toSignedUrlIfNeeded = async (keyOrUrl) => {
+  if (!keyOrUrl || typeof keyOrUrl !== 'string') return '';
+  if (keyOrUrl.startsWith('http')) return keyOrUrl;
+
+  const command = new GetObjectCommand({
+    Bucket: process.env.AWS_BUCKET_NAME,
+    Key: keyOrUrl
+  });
+
+  return getSignedUrl(s3, command, { expiresIn: 3600 });
+};
+
 // @desc    Get all users (with search capabilities)
 // @route   GET /api/v1/users
 // @access  Private (Owner/Manager)
@@ -35,8 +47,38 @@ exports.getUser = asyncHandler(async (req, res, next) => {
   });
 });
 
+// @desc    Get my avatar (signed URL)
+// @route   GET /api/v1/users/avatar
+// @access  Private
+exports.getMyAvatar = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.user.id).select('photoUrl');
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  if (!user.photoUrl) {
+    return res.status(200).json({
+      success: true,
+      data: {
+        photoKey: '',
+        photoUrl: ''
+      }
+    });
+  }
+
+  const signedUrl = await toSignedUrlIfNeeded(user.photoUrl);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      photoKey: user.photoUrl,
+      photoUrl: signedUrl
+    }
+  });
+});
+
 // @desc    Upload/update my avatar
-// @route   POST /api/v1/users/avatar
+// @route   PUT /api/v1/users/avatar
 // @access  Private
 exports.uploadAvatar = asyncHandler(async (req, res, next) => {
   if (!req.file?.key) {
@@ -53,7 +95,7 @@ exports.uploadAvatar = asyncHandler(async (req, res, next) => {
   await user.save();
 
   // Best-effort cleanup of previous avatar
-  if (previousKey && typeof previousKey === 'string' && previousKey.startsWith('avatars/')) {
+  if (previousKey && typeof previousKey === 'string' && !previousKey.startsWith('http')) {
     try {
       await s3.send(
         new DeleteObjectCommand({
@@ -66,11 +108,7 @@ exports.uploadAvatar = asyncHandler(async (req, res, next) => {
     }
   }
 
-  const command = new GetObjectCommand({
-    Bucket: process.env.AWS_BUCKET_NAME,
-    Key: user.photoUrl
-  });
-  const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+  const signedUrl = await toSignedUrlIfNeeded(user.photoUrl);
 
   res.status(200).json({
     success: true,
@@ -78,5 +116,37 @@ exports.uploadAvatar = asyncHandler(async (req, res, next) => {
       photoKey: user.photoUrl,
       photoUrl: signedUrl
     }
+  });
+});
+
+// @desc    Delete my avatar
+// @route   DELETE /api/v1/users/avatar
+// @access  Private
+exports.deleteMyAvatar = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.user.id).select('photoUrl');
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  const previousKey = user.photoUrl;
+  user.photoUrl = '';
+  await user.save();
+
+  if (previousKey && typeof previousKey === 'string' && !previousKey.startsWith('http')) {
+    try {
+      await s3.send(
+        new DeleteObjectCommand({
+          Bucket: process.env.AWS_BUCKET_NAME,
+          Key: previousKey
+        })
+      );
+    } catch (e) {
+      // Ignore cleanup failure
+    }
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {}
   });
 });
