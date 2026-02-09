@@ -148,11 +148,10 @@ exports.createClass = asyncHandler(async (req, res, next) => {
     return next(new AppError('Please provide title and startTime', 400));
   }
 
-  let trainer = null;
-  if (trainerId) {
-    trainer = await User.findById(trainerId);
-    if (!trainer) return next(new AppError('Trainer not found', 404));
-    if (trainer.role !== 'trainer') return next(new AppError('Selected user is not a trainer', 400));
+  // Trainers create classes for themselves.
+  // Allow trainerId only if it matches the logged-in trainer (backward-compatible payloads).
+  if (trainerId && String(trainerId) !== String(req.user.id)) {
+    return next(new AppError('Not authorized to create a class for another trainer', 403));
   }
 
   const session = await ClassSession.create({
@@ -160,7 +159,7 @@ exports.createClass = asyncHandler(async (req, res, next) => {
     description: description || '',
     startTime: new Date(startTime),
     endTime: endTime ? new Date(endTime) : null,
-    trainer: trainer ? trainer._id : null,
+    trainer: req.user.id,
     capacity: capacity || 20,
     status: 'scheduled',
     createdBy: req.user.id
@@ -179,6 +178,11 @@ exports.updateClass = asyncHandler(async (req, res, next) => {
   const session = await ClassSession.findById(req.params.id);
   if (!session) return next(new AppError('Class not found', 404));
 
+  // Only the trainer who owns the class can manage it.
+  if (!session.trainer || String(session.trainer) !== String(req.user.id)) {
+    return next(new AppError('Not authorized to update this class', 403));
+  }
+
   const { title, description, startTime, endTime, trainerId, capacity, status } = req.body;
 
   if (title !== undefined) session.title = title;
@@ -192,15 +196,9 @@ exports.updateClass = asyncHandler(async (req, res, next) => {
     session.status = status;
   }
 
-  if (trainerId !== undefined) {
-    if (!trainerId) {
-      session.trainer = null;
-    } else {
-      const trainer = await User.findById(trainerId);
-      if (!trainer) return next(new AppError('Trainer not found', 404));
-      if (trainer.role !== 'trainer') return next(new AppError('Selected user is not a trainer', 400));
-      session.trainer = trainer._id;
-    }
+  // Trainer cannot reassign a class to another trainer.
+  if (trainerId !== undefined && String(trainerId || '') !== String(req.user.id)) {
+    return next(new AppError('Not authorized to reassign trainer for this class', 403));
   }
 
   await session.save();
@@ -217,6 +215,10 @@ exports.updateClass = asyncHandler(async (req, res, next) => {
 exports.getClassAttendance = asyncHandler(async (req, res, next) => {
   const session = await ClassSession.findById(req.params.id);
   if (!session) return next(new AppError('Class not found', 404));
+
+  if (!session.trainer || String(session.trainer) !== String(req.user.id)) {
+    return next(new AppError('Not authorized to view attendance for this class', 403));
+  }
 
   const attendance = await ClassAttendance.find({ classSession: session._id })
     .populate('user', 'name email role')
@@ -248,6 +250,10 @@ exports.markClassAttendance = asyncHandler(async (req, res, next) => {
   const session = await ClassSession.findById(classId);
   if (!session) return next(new AppError('Class not found', 404));
 
+  if (!session.trainer || String(session.trainer) !== String(req.user.id)) {
+    return next(new AppError('Not authorized to mark attendance for this class', 403));
+  }
+
   const user = await User.findById(userId);
   if (!user) return next(new AppError('User not found', 404));
 
@@ -266,5 +272,25 @@ exports.markClassAttendance = asyncHandler(async (req, res, next) => {
   res.status(200).json({
     success: true,
     data: record
+  });
+});
+
+// @desc    Delete a class slot
+// @route   DELETE /api/v1/classes/:id
+// @access  Private (Trainer)
+exports.deleteClass = asyncHandler(async (req, res, next) => {
+  const session = await ClassSession.findById(req.params.id);
+  if (!session) return next(new AppError('Class not found', 404));
+
+  if (!session.trainer || String(session.trainer) !== String(req.user.id)) {
+    return next(new AppError('Not authorized to delete this class', 403));
+  }
+
+  await ClassAttendance.deleteMany({ classSession: session._id });
+  await session.deleteOne();
+
+  res.status(200).json({
+    success: true,
+    data: {}
   });
 });

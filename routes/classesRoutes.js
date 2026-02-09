@@ -5,6 +5,7 @@ const {
   getSchedule,
   createClass,
   updateClass,
+  deleteClass,
   getClassAttendance,
   markClassAttendance,
   bookClass,
@@ -23,10 +24,11 @@ router.use(protect);
 router.post('/:id/book', authorize('member'), bookClass);
 router.delete('/:id/cancel', authorize('member'), cancelBooking);
 
-// Manager/Owner class management
-router.post('/', authorize('manager', 'owner'), createClass);
-router.put('/:id', authorize('manager', 'owner'), updateClass);
-router.get('/attendance/:id', authorize('manager', 'owner'), getClassAttendance);
-router.post('/attendance/mark', authorize('manager', 'owner'), markClassAttendance);
+// Trainer class management
+router.post('/', authorize('trainer'), createClass);
+router.put('/:id', authorize('trainer'), updateClass);
+router.delete('/:id', authorize('trainer'), deleteClass);
+router.get('/attendance/:id', authorize('trainer'), getClassAttendance);
+router.post('/attendance/mark', authorize('trainer'), markClassAttendance);
 
 module.exports = router;

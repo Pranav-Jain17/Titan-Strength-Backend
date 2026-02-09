@@ -23,7 +23,7 @@ const normalizeTags = (tags) => {
 
 // @desc    Get workout videos
 // @route   GET /api/v1/content/videos
-// @access  Private (Member)
+// @access  Private (Member,Trainer)
 exports.getVideos = asyncHandler(async (req, res) => {
   const videos = await Video.find({ active: true }).sort('-createdAt');
 

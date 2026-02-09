@@ -1,6 +1,6 @@
 const Subscription = require('../models/subscription');
 const Plan = require('../models/plan');
-const User = require('../models/user'); // Ensure this matches your file name exactly
+const User = require('../models/user');
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/appError');
 
@@ -71,7 +71,7 @@ exports.getSubscriptions = asyncHandler(async (req, res, next) => {
 
   // If 'email' is in the URL (e.g. ?email=john@gmail.com), find that user's ID first
   if (req.query.email) {
-    const user = await User.findOne({ email: req.query.email });
+    const user = await User.findOne({ email: req.query.email.toLowerCase() });
     if (!user) {
       // If user doesn't exist, return empty list (no subscriptions)
       return res.status(200).json({ success: true, count: 0, data: [] }); 
