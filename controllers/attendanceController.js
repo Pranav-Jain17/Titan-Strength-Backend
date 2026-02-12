@@ -3,6 +3,7 @@ const AppError = require('../utils/appError');
 
 const Attendance = require('../models/attendance');
 const { findActiveSubscriptionForUser } = require('../utils/subscriptionUtils');
+const notify = require('../utils/notify');
 
 // @desc    Self check-in (member)
 // @route   POST /api/v1/attendance/check-in
@@ -37,6 +38,14 @@ exports.checkIn = asyncHandler(async (req, res, next) => {
     checkedOutAt: null,
     note,
     createdBy: req.user.id
+  });
+
+  await notify({
+    userId: req.user.id,
+    title: 'Check-in Confirmed',
+    message: `Welcome back! You checked in at ${new Date().toLocaleTimeString()}`,
+    type: 'success',
+    sendMail: false
   });
 
   res.status(201).json({

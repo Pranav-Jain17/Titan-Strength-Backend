@@ -8,8 +8,12 @@ const Notification = require('../models/notification');
 exports.getMyNotifications = asyncHandler(async (req, res) => {
   const unreadOnly = String(req.query.unread || '').toLowerCase() === 'true';
 
-  const filter = { user: req.user.id };
-  if (unreadOnly) filter.readAt = null;
+  const filter = {
+    $or: [{ recipient: req.user.id }, { user: req.user.id }]
+  };
+  if (unreadOnly) {
+    filter.$and = [{ $or: [{ isRead: false }, { readAt: null }] }];
+  }
 
   const notifications = await Notification.find(filter)
     .sort('-createdAt')
@@ -32,13 +36,20 @@ exports.markRead = asyncHandler(async (req, res) => {
   let result;
   if (ids && ids.length > 0) {
     result = await Notification.updateMany(
-      { _id: { $in: ids }, user: req.user.id, readAt: null },
-      { $set: { readAt: now } }
+      {
+        _id: { $in: ids },
+        $or: [{ recipient: req.user.id }, { user: req.user.id }],
+        $or: [{ isRead: false }, { readAt: null }]
+      },
+      { $set: { isRead: true, readAt: now } }
     );
   } else {
     result = await Notification.updateMany(
-      { user: req.user.id, readAt: null },
-      { $set: { readAt: now } }
+      {
+        $or: [{ recipient: req.user.id }, { user: req.user.id }],
+        $or: [{ isRead: false }, { readAt: null }]
+      },
+      { $set: { isRead: true, readAt: now } }
     );
   }
 

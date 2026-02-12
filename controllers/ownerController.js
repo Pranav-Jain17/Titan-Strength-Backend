@@ -6,6 +6,7 @@ const Branch = require('../models/branch');
 const Subscription = require('../models/subscription');
 const Plan = require('../models/plan');
 const { buildMonthKeysUTC } = require('../utils/revenueChartUtils');
+const notify = require('../utils/notify');
 
 // @desc    List managers + the branch they manage
 // @route   GET /api/v1/owner/managers
@@ -146,6 +147,21 @@ exports.getOwnerDashboard = asyncHandler(async (req, res, next) => {
 exports.createPlan = asyncHandler(async (req, res, next) => {
   const plan = await Plan.create(req.body);
 
+  const users = await User.find({
+    role: { $in: ['member', 'trainer'] },
+    status: 'active'
+  }).select('_id');
+
+  users.forEach((u) => {
+    notify({
+      userId: u._id,
+      title: 'New Plan Added',
+      message: `A new plan is now available: ${plan.name}. Check it out in the app.`,
+      type: 'info',
+      sendMail: true
+    });
+  });
+
   res.status(201).json({
     success: true,
     data: plan
@@ -210,6 +226,21 @@ exports.createBranch = asyncHandler(async (req, res, next) => {
   }
 
   const branch = await Branch.create(req.body);
+
+  const users = await User.find({
+    role: { $in: ['member', 'trainer'] },
+    status: 'active'
+  }).select('_id');
+
+  users.forEach((u) => {
+    notify({
+      userId: u._id,
+      title: 'New Location Opened',
+      message: `We are excited to announce our new branch: ${branch.name} at ${branch.address}. Come visit us!`,
+      type: 'info',
+      sendMail: true
+    });
+  });
 
   res.status(201).json({
     success: true,

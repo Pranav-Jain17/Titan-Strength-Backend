@@ -24,6 +24,7 @@ const attendanceRoutes = require('./routes/attendanceRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 // const paymentController = require('./controllers/paymentController');
 const checkSubscriptionExpiry = require('./utils/checkSubscriptionExpiry');
+const { scheduleClassReminders } = require('./utils/cronJobs');
 
 let swaggerFile;
 try {
@@ -67,6 +68,7 @@ app.use('/api/v1/attendance', attendanceRoutes);
 app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 checkSubscriptionExpiry();
+scheduleClassReminders();
 
 // Swagger UI (auto-generated via `node swagger.js`)
 app.use(

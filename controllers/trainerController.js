@@ -10,6 +10,7 @@ const Diet = require('../models/diet');
 const DietAssignment = require('../models/dietAssignment');
 const Video = require('../models/video');
 const WorkoutAssignment = require('../models/workoutAssignment');
+const notify = require('../utils/notify');
 
 const startOfDay = (d) => {
   const x = new Date(d);
@@ -273,6 +274,14 @@ exports.assignDietToClient = asyncHandler(async (req, res, next) => {
     assignedBy: req.user.id
   });
 
+  await notify({
+    userId: req.params.userId,
+    title: 'Diet Plan Assigned',
+    message: 'A new diet plan has been assigned to you. Check your plan in the app.',
+    type: 'info',
+    sendMail: true
+  });
+
   res.status(201).json({
     success: true,
     data: assignment
@@ -306,6 +315,14 @@ exports.assignWorkoutToClient = asyncHandler(async (req, res, next) => {
     notes: notes || '',
     active: true,
     assignedBy: req.user.id
+  });
+
+  await notify({
+    userId: req.params.userId,
+    title: 'Workout Plan Assigned',
+    message: 'A new workout plan has been assigned to you. Check your plan in the app.',
+    type: 'info',
+    sendMail: true
   });
 
   res.status(201).json({

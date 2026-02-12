@@ -12,6 +12,7 @@ const Maintenance = require('../models/maintenance');
 const TrainerAssignment = require('../models/trainerAssignment');
 
 const { findActiveSubscriptionForUser } = require('../utils/subscriptionUtils');
+const notify = require('../utils/notify');
 
 // 1) DAILY OPERATIONS
 
@@ -57,6 +58,14 @@ exports.checkIn = asyncHandler(async (req, res, next) => {
     checkedOutAt: null,
     note: note || '',
     createdBy: req.user.id
+  });
+
+  await notify({
+    userId: user._id,
+    title: 'Check-in Confirmed',
+    message: `You were checked in at ${new Date().toLocaleTimeString()}`,
+    type: 'success',
+    sendMail: false
   });
 
   res.status(201).json({
@@ -512,6 +521,22 @@ exports.assignTrainerToMember = asyncHandler(async (req, res, next) => {
     assignedBy: req.user.id
   });
 
+  await notify({
+    userId: trainer._id,
+    title: 'New Client Assignment',
+    message: `You have been assigned a new client: ${member.name || member.email}.`,
+    type: 'info',
+    sendMail: true
+  });
+
+  await notify({
+    userId: member._id,
+    title: 'Trainer Assigned',
+    message: `A trainer has been assigned to you: ${trainer.name || trainer.email}.`,
+    type: 'info',
+    sendMail: true
+  });
+
   res.status(201).json({
     success: true,
     data: assignment
@@ -605,6 +630,14 @@ exports.assignTrainerToBranch = asyncHandler(async (req, res, next) => {
 
   trainer.homeBranch = branch._id;
   await trainer.save({ validateBeforeSave: false });
+
+  await notify({
+    userId: trainer._id,
+    title: 'New Branch Assignment',
+    message: `You have been assigned to the ${branch.name} branch.`,
+    type: 'info',
+    sendMail: true
+  });
 
   res.status(200).json({
     success: true,

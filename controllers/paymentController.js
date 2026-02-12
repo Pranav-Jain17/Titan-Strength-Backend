@@ -6,6 +6,7 @@ const AppError = require('../utils/appError');
 
 const Plan = require('../models/plan');
 const Subscription = require('../models/subscription');
+const notify = require('../utils/notify');
 
 const getRazorpayClient = () => {
 	if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -161,6 +162,14 @@ exports.verifyRazorpayPaymentAndSubscribe = asyncHandler(async (req, res, next) 
 	// Upgrade user to member (matches existing behavior)
 	req.user.role = 'member';
 	await req.user.save({ validateBeforeSave: false });
+
+	await notify({
+		userId: req.user.id,
+		title: 'Payment Successful',
+		message: `You have successfully purchased the ${plan.name} plan. Let's get to work!`,
+		type: 'success',
+		sendMail: true
+	});
 
 	res.status(201).json({
 		success: true,
