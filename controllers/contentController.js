@@ -5,9 +5,7 @@ const Video = require('../models/video');
 const Diet = require('../models/diet');
 const DietAssignment = require('../models/dietAssignment');
 const WorkoutAssignment = require('../models/workoutAssignment');
-const { GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { s3 } = require('../middleware/fileUpload'); 
+const { cloudinary } = require('../middleware/fileUpload'); 
 
 const normalizeTags = (tags) => {
   if (tags === undefined) return undefined;
@@ -27,26 +25,20 @@ const normalizeTags = (tags) => {
 exports.getVideos = asyncHandler(async (req, res) => {
   const videos = await Video.find({ active: true }).sort('-createdAt');
 
-  // Generate temporary URLs for each video
+  // Generate dynamic URLs for each video
   const videoList = await Promise.all(videos.map(async (video) => {
-    // If it's a YouTube link, return as is
+    // If it's a YouTube link or already a full URL, return as is
     if (video.url.startsWith('http')) {
       return video;
     }
 
-    // If it's an S3 key, generate a signed URL
-    const command = new GetObjectCommand({
-      Bucket: process.env.AWS_BUCKET_NAME,
-      Key: video.url,
-    });
-
-    // Create a URL valid for 1 hour (3600 seconds)
-    const signedUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
+    // If it's a Cloudinary public_id, generate a dynamic URL
+    const dynamicUrl = cloudinary.url(video.url, { resource_type: 'video', secure: true });
 
     // Return the video object with the temporary URL swapped in
     return {
       ...video.toObject(),
-      url: signedUrl
+      url: dynamicUrl
     };
   }));
 
@@ -68,8 +60,8 @@ exports.createVideo = asyncHandler(async (req, res, next) => {
 
   const video = await Video.create({
     title: title,
-    // We save ONLY the key (e.g., "videos/12345.mp4"), NOT the full URL
-    url: req.file.key, 
+    // We save ONLY the public_id (filename), NOT the full URL
+    url: req.file.filename, 
     description: description,
     tags: normalizeTags(tags) ?? [],
     active: active
@@ -104,21 +96,16 @@ exports.updateVideo = asyncHandler(async (req, res, next) => {
   }
 
   // Optional: replace the underlying video file
-  if (req.file?.key) {
+  if (req.file?.filename) {
     const oldKey = video.url;
-    video.url = req.file.key;
+    video.url = req.file.filename;
 
-    // Best-effort cleanup of the old S3 object (only when we store a key)
+    // Best-effort cleanup of the old Cloudinary object
     if (oldKey && typeof oldKey === 'string' && !oldKey.startsWith('http')) {
       try {
-        await s3.send(
-          new DeleteObjectCommand({
-            Bucket: process.env.AWS_BUCKET_NAME,
-            Key: oldKey
-          })
-        );
+        await cloudinary.uploader.destroy(oldKey, { resource_type: 'video' });
       } catch (e) {
-        // Ignore S3 deletion failure to avoid blocking updates
+        // Ignore deletion failure
       }
     }
   }
@@ -144,15 +131,10 @@ exports.deleteVideo = asyncHandler(async (req, res, next) => {
 
   await video.deleteOne();
 
-  // Best-effort cleanup of S3 object
+  // Best-effort cleanup of Cloudinary object
   if (key && typeof key === 'string' && !key.startsWith('http')) {
     try {
-      await s3.send(
-        new DeleteObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: key
-        })
-      );
+      await cloudinary.uploader.destroy(key, { resource_type: 'video' });
     } catch (e) {
       // Ignore cleanup failure
     }

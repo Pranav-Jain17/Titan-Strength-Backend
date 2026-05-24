@@ -1,20 +1,13 @@
-const User = require('../models/user'); // Matches your filename
+const User = require('../models/user'); 
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/appError');
-const { GetObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { s3 } = require('../middleware/fileUpload');
+const { cloudinary } = require('../middleware/fileUpload');
 
-const toSignedUrlIfNeeded = async (keyOrUrl) => {
+const toCloudinaryUrlIfNeeded = (keyOrUrl) => {
   if (!keyOrUrl || typeof keyOrUrl !== 'string') return '';
   if (keyOrUrl.startsWith('http')) return keyOrUrl;
 
-  const command = new GetObjectCommand({
-    Bucket: process.env.AWS_BUCKET_NAME,
-    Key: keyOrUrl
-  });
-
-  return getSignedUrl(s3, command, { expiresIn: 3600 });
+  return cloudinary.url(keyOrUrl, { secure: true });
 };
 
 // @desc    Get all users (with search capabilities)
@@ -47,7 +40,7 @@ exports.getUser = asyncHandler(async (req, res, next) => {
   });
 });
 
-// @desc    Get my avatar (signed URL)
+// @desc    Get my avatar (dynamic URL)
 // @route   GET /api/v1/users/avatar
 // @access  Private
 exports.getMyAvatar = asyncHandler(async (req, res, next) => {
@@ -66,13 +59,13 @@ exports.getMyAvatar = asyncHandler(async (req, res, next) => {
     });
   }
 
-  const signedUrl = await toSignedUrlIfNeeded(user.photoUrl);
+  const dynamicUrl = toCloudinaryUrlIfNeeded(user.photoUrl);
 
   res.status(200).json({
     success: true,
     data: {
       photoKey: user.photoUrl,
-      photoUrl: signedUrl
+      photoUrl: dynamicUrl
     }
   });
 });
@@ -81,7 +74,7 @@ exports.getMyAvatar = asyncHandler(async (req, res, next) => {
 // @route   PUT /api/v1/users/avatar
 // @access  Private
 exports.uploadAvatar = asyncHandler(async (req, res, next) => {
-  if (!req.file?.key) {
+  if (!req.file?.filename) {
     return next(new AppError('Please upload an image file', 400));
   }
 
@@ -91,30 +84,25 @@ exports.uploadAvatar = asyncHandler(async (req, res, next) => {
   }
 
   const previousKey = user.photoUrl;
-  user.photoUrl = req.file.key;
+  user.photoUrl = req.file.filename;
   await user.save();
 
   // Best-effort cleanup of previous avatar
   if (previousKey && typeof previousKey === 'string' && !previousKey.startsWith('http')) {
     try {
-      await s3.send(
-        new DeleteObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: previousKey
-        })
-      );
+      await cloudinary.uploader.destroy(previousKey);
     } catch (e) {
       // Ignore cleanup failure
     }
   }
 
-  const signedUrl = await toSignedUrlIfNeeded(user.photoUrl);
+  const dynamicUrl = toCloudinaryUrlIfNeeded(user.photoUrl);
 
   res.status(200).json({
     success: true,
     data: {
       photoKey: user.photoUrl,
-      photoUrl: signedUrl
+      photoUrl: dynamicUrl
     }
   });
 });
@@ -134,12 +122,7 @@ exports.deleteMyAvatar = asyncHandler(async (req, res, next) => {
 
   if (previousKey && typeof previousKey === 'string' && !previousKey.startsWith('http')) {
     try {
-      await s3.send(
-        new DeleteObjectCommand({
-          Bucket: process.env.AWS_BUCKET_NAME,
-          Key: previousKey
-        })
-      );
+      await cloudinary.uploader.destroy(previousKey);
     } catch (e) {
       // Ignore cleanup failure
     }

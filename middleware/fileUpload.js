@@ -1,29 +1,28 @@
 const multer = require('multer');
-const multerS3 = require('multer-s3');
-const { S3Client } = require('@aws-sdk/client-s3');
-const path = require('path');
+const { CloudinaryStorage } = require('multer-storage-cloudinary-v2');
+const cloudinary = require('cloudinary').v2;
 
-const s3 = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'videos',
+    resource_type: 'video',
+    public_id: (req, file) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      return `${uniqueSuffix}`;
+    }
   }
 });
 
 const upload = multer({
-  storage: multerS3({
-    s3: s3,
-    bucket: process.env.AWS_BUCKET_NAME,
-    acl: 'private', 
-    contentType: multerS3.AUTO_CONTENT_TYPE,
-    key: function (req, file, cb) {
-      // Create a unique filename: videos/1739283-workout.mp4
-      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, `videos/${uniqueSuffix}${path.extname(file.originalname)}`);
-    }
-  }),
-  // Limit file size to 100MB
+  storage: storage,
   limits: { fileSize: 100 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('video/')) {
@@ -34,17 +33,20 @@ const upload = multer({
   }
 });
 
-const uploadAvatar = multer({
-  storage: multerS3({
-    s3: s3,
-    bucket: process.env.AWS_BUCKET_NAME,
-    acl: 'private',
-    contentType: multerS3.AUTO_CONTENT_TYPE,
-    key: function (req, file, cb) {
+const avatarStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: 'avatars',
+    resource_type: 'image',
+    public_id: (req, file) => {
       const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-      cb(null, `avatars/${uniqueSuffix}${path.extname(file.originalname)}`);
+      return `${uniqueSuffix}`;
     }
-  }),
+  }
+});
+
+const uploadAvatar = multer({
+  storage: avatarStorage,
   limits: { fileSize: 10 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
     if (file.mimetype.startsWith('image/')) {
@@ -55,4 +57,4 @@ const uploadAvatar = multer({
   }
 });
 
-module.exports = { upload, uploadAvatar, s3 };
+module.exports = { upload, uploadAvatar, cloudinary };

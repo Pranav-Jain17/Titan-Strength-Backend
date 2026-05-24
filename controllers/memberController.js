@@ -1,8 +1,6 @@
 const asyncHandler = require('../middleware/asyncHandler');
 const AppError = require('../utils/appError');
-const { GetObjectCommand } = require('@aws-sdk/client-s3');
-const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
-const { s3 } = require('../middleware/fileUpload');
+const { cloudinary } = require('../middleware/fileUpload');
 
 const User = require('../models/user');
 const Subscription = require('../models/subscription');
@@ -17,15 +15,7 @@ exports.getMe = asyncHandler(async (req, res, next) => {
 
   let photoUrl = user.photoUrl || '';
   if (photoUrl && typeof photoUrl === 'string' && !photoUrl.startsWith('http')) {
-    try {
-      const command = new GetObjectCommand({
-        Bucket: process.env.AWS_BUCKET_NAME,
-        Key: photoUrl
-      });
-      photoUrl = await getSignedUrl(s3, command, { expiresIn: 3600 });
-    } catch (e) {
-      // If signing fails (missing env/creds), fall back to stored value
-    }
+    photoUrl = cloudinary.url(photoUrl, { secure: true });
   }
 
   res.status(200).json({
