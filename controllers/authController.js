@@ -106,19 +106,12 @@ exports.register = asyncHandler(async (req, res, next) => {
       <p>This link is valid for 24 hours.</p>
     `;
 
-    try {
-      await sendEmail({
-        email: existingUser.email,
-        subject: 'Verify your email',
-        message
-      });
-    } catch (err) {
-      console.error(err);
-      existingUser.emailVerificationToken = undefined;
-      existingUser.emailVerificationExpire = undefined;
-      await existingUser.save({ validateBeforeSave: false });
-      return next(new AppError('Verification email could not be sent', 500));
-    }
+    // Send email in background (non-blocking)
+    sendEmail({
+      email: existingUser.email,
+      subject: 'Verify your email',
+      message
+    });
 
     return res.status(200).json({
       success: true,
@@ -140,19 +133,12 @@ exports.register = asyncHandler(async (req, res, next) => {
     <p>This link is valid for 24 hours.</p>
   `;
 
-  try {
-    await sendEmail({
-      email: user.email,
-      subject: 'Verify your email',
-      message
-    });
-  } catch (err) {
-    console.error(err);
-    user.emailVerificationToken = undefined;
-    user.emailVerificationExpire = undefined;
-    await user.save({ validateBeforeSave: false });
-    return next(new AppError('Verification email could not be sent', 500));
-  }
+  // Send email in background (non-blocking)
+  sendEmail({
+    email: user.email,
+    subject: 'Verify your email',
+    message
+  });
 
   res.status(201).json({
     success: true,
@@ -235,25 +221,17 @@ exports.forgotPassword = asyncHandler(async (req, res, next) => {
     <p>If you did not request this, you can ignore this email.</p>
   `;
 
-  try {
-    await sendEmail({
-      email: user.email,
-      subject: 'Password reset',
-      message
-    });
+  // Send email in background (non-blocking)
+  sendEmail({
+    email: user.email,
+    subject: 'Password reset',
+    message
+  });
 
-    return res.status(200).json({
-      success: true,
-      data: 'If that email exists, a reset link has been sent.'
-    });
-  } catch (err) {
-    console.error('Forgot Password Error:', err);
-    user.resetPasswordToken = undefined;
-    user.resetPasswordExpire = undefined;
-    await user.save({ validateBeforeSave: false });
-
-    return next(new AppError('Email could not be sent', 500));
-  }
+  return res.status(200).json({
+    success: true,
+    data: 'If that email exists, a reset link has been sent.'
+  });
 });
 
 exports.resetPassword = asyncHandler(async (req, res, next) => {
