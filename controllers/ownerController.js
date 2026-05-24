@@ -125,7 +125,13 @@ exports.getOwnerDashboard = asyncHandler(async (req, res, next) => {
     .populate('plan', 'name price');
 
   const activeSubs = await Subscription.find({ status: 'active' }).populate('plan');
-  const totalRevenue = activeSubs.reduce((acc, sub) => acc + (sub.plan.price || 0), 0);
+  const totalRevenue = activeSubs.reduce((acc, sub) => {
+    // Safety check: Plan might have been deleted but subscription remains
+    if (sub.plan && typeof sub.plan.price === 'number') {
+      return acc + sub.plan.price;
+    }
+    return acc;
+  }, 0);
 
   res.status(200).json({
     success: true,

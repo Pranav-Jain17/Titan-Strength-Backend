@@ -212,6 +212,12 @@ exports.getMyWorkoutPlan = asyncHandler(async (req, res) => {
   }
 
   const video = assignment.video;
+  let videoUrl = video?.url || null;
+
+  // Generate dynamic Cloudinary URL if it's a stored key
+  if (videoUrl && typeof videoUrl === 'string' && !videoUrl.startsWith('http')) {
+    videoUrl = cloudinary.url(videoUrl, { resource_type: 'video', secure: true });
+  }
 
   res.status(200).json({
     success: true,
@@ -219,7 +225,7 @@ exports.getMyWorkoutPlan = asyncHandler(async (req, res) => {
       assignmentId: String(assignment._id),
       videoId: video ? String(video._id) : null,
       title: video?.title || null,
-      url: video?.url || null,
+      url: videoUrl,
       thumbnailUrl: video?.thumbnailUrl || '',
       description: video?.description || '',
       tags: video?.tags || [],

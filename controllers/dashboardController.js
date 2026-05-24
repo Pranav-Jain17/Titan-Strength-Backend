@@ -57,7 +57,7 @@ exports.getMemberDashboard = asyncHandler(async (req, res, next) => {
     success: true,
     data: {
       userName: req.user.name,
-      membership: activeSub ? {
+      membership: (activeSub && activeSub.plan) ? {
         planName: activeSub.plan.name,
         expiresOn: activeSub.endDate,
         status: 'Active'
